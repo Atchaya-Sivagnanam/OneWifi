@@ -822,25 +822,37 @@ int sm_event(wifi_app_t *app, wifi_event_t *event)
     return RETURN_OK;
 }
 
-static void sm_app_enable_handler(char *event_name, bus_data_prop_t *p_data)
+static bus_error_t sm_app_enable_handler(char *event_name, bus_data_prop_t *p_data,
+    void *userData)
 {
     bool sm_app_enable;
+    (void)userData;
+      wifi_util_info_print(WIFI_BUS,
+        "%s:%d SM_APP handler entered event=%s\n",
+        __func__, __LINE__,
+        event_name ? event_name : "NULL");
 
     wifi_util_dbg_print(WIFI_SM, "%s:%d recvd event\n", __func__, __LINE__);
 
+
     if ((strcmp(event_name, BUS_SM_APP_DISABLE) != 0) ||
+
+    if ((event_name == NULL) || (p_data == NULL) ||
+        (strcmp(event_name, BUS_SM_APP_DISABLE) != 0) ||
+
         (p_data->value.data_type != bus_data_type_boolean)) {
         wifi_util_error_print(WIFI_SM, "%s:%d invalid event received,%s:%x\n", __func__, __LINE__,
-            event_name, p_data->value.data_type);
-        return;
+            event_name != NULL ? event_name : "NULL",
+            p_data != NULL ? p_data->value.data_type : bus_data_type_none);
+        return bus_error_invalid_input;
     }
 
     /* The RFC parameter is expressed as Disable, while the SM application
      * consumes the corresponding Enable state. */
     sm_app_enable = !p_data->value.raw_data.b;
 
-    push_event_to_ctrl_queue(&sm_app_enable, sizeof(sm_app_enable), wifi_event_type_command,
-        wifi_event_type_sm_app_enable, NULL);
+    return push_event_to_ctrl_queue(&sm_app_enable, sizeof(sm_app_enable), wifi_event_type_command,
+        wifi_event_type_sm_app_enable, NULL) == RETURN_OK ? bus_error_success : bus_error_general;
 }
 
 static int sm_events_timer_task(void *args)
