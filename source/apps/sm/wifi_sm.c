@@ -77,7 +77,6 @@ int sm_survey_type_conversion(wifi_neighborScanMode_t *halw_scan_type, survey_ty
             }
         }
     }
-
     return RETURN_ERR;
 }
 
@@ -833,6 +832,7 @@ static bus_error_t sm_app_enable_handler(char *event_name, bus_data_prop_t *p_da
         event_name ? event_name : "NULL");
 
     wifi_util_dbg_print(WIFI_SM, "%s:%d recvd event\n", __func__, __LINE__);
+
     if ((event_name == NULL) || (p_data == NULL) ||
         (strcmp(event_name, BUS_SM_APP_DISABLE) != 0) ||
         (p_data->value.data_type != bus_data_type_boolean)) {
@@ -840,10 +840,10 @@ static bus_error_t sm_app_enable_handler(char *event_name, bus_data_prop_t *p_da
             event_name != NULL ? event_name : "NULL",
             p_data != NULL ? p_data->value.data_type : bus_data_type_none);
         return bus_error_invalid_input;
-    }
-
+  }
     /* The RFC parameter is expressed as Disable, while the SM application
      * consumes the corresponding Enable state. */
+
     sm_app_enable = !p_data->value.raw_data.b;
 
     return push_event_to_ctrl_queue(&sm_app_enable, sizeof(sm_app_enable), wifi_event_type_command,
