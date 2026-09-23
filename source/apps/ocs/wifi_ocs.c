@@ -42,7 +42,7 @@
 #if defined (FEATURE_OFF_CHANNEL_SCAN_5G)
 
 #define OCS_NEIGBOUR_SCAN_PROVIDER_DELAY_SEC 5
-#define OFFCHAN_DEFAULT_NSCAN_IN_SEC 10800
+#define OFFCHAN_DEFAULT_NSCAN_IN_SEC 600
 #define SEC_TO_MILLISEC 1000
 static int off_chan_scan_init (unsigned int radio_index);
 void off_chan_print_neighbour_data (wifi_provider_response_t *provider_response);
