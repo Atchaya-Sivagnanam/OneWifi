@@ -34,6 +34,42 @@
 #define RADIO_SCAN_MAX_RESULTS_RETRIES_ON_AND_OFF_SCAN 35 //7 seconds
 #define NEIGHBOR_SCAN_RETRY_INTERVAL 100 //100ms
 #define NEIGHBOR_SCAN_MAX_RETRY 10
+#define ONCHAN_DFS_SCAN_INTERVAL_SECONDS 10
+
+static bool is_dfs_sensitive_onchan_scan(wifi_radio_operationParam_t *radioOperation)
+{
+    if (radioOperation == NULL) {
+        return false;
+    }
+
+    if (radioOperation->band != WIFI_FREQUENCY_5L_BAND &&
+        radioOperation->band != WIFI_FREQUENCY_5H_BAND &&
+        radioOperation->band != WIFI_FREQUENCY_5_BAND) {
+        return false;
+    }
+
+    return is_5g_20M_channel_in_dfs(radioOperation->channel) ||
+        radioOperation->channelWidth == WIFI_CHANNELBANDWIDTH_160MHZ;
+}
+
+static bool is_onchan_scan_interval_active(struct timespec *last_scan_time)
+{
+    struct timespec now;
+    time_t elapsed_seconds;
+
+    if (last_scan_time == NULL || (last_scan_time->tv_sec == 0 && last_scan_time->tv_nsec == 0)) {
+        return false;
+    }
+
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0 ||
+        now.tv_sec < last_scan_time->tv_sec ||
+        (now.tv_sec == last_scan_time->tv_sec && now.tv_nsec < last_scan_time->tv_nsec)) {
+        return false;
+    }
+
+    elapsed_seconds = now.tv_sec - last_scan_time->tv_sec;
+    return elapsed_seconds < ONCHAN_DFS_SCAN_INTERVAL_SECONDS;
+}
 
 int validate_radio_channel_args(wifi_mon_stats_args_t *args)
 {
@@ -893,6 +929,18 @@ int execute_radio_channel_api(wifi_mon_collector_element_t *c_elem, wifi_monitor
         return ret;
     }
 
+    if (args->scan_mode == WIFI_RADIO_SCAN_MODE_ONCHAN &&
+        is_dfs_sensitive_onchan_scan(radioOperation) &&
+        is_onchan_scan_interval_active(&mon_data->last_onchan_scan_time[args->radio_index])) {
+        wifi_util_dbg_print(WIFI_MON,
+            "%s:%d suppressing ONCHAN scan during DFS scan interval for radio %d\n",
+            __func__, __LINE__, args->radio_index);
+        mon_data->scan_status[args->radio_index] = 0;
+        mon_data->scan_trigger_retries[args->radio_index] = 0;
+        mon_data->scan_failed[args->radio_index] = false;
+        return RETURN_OK;
+    }
+
     if (args->scan_mode == WIFI_RADIO_SCAN_MODE_ONCHAN) {
         if (get_on_channel_scan_list(radioOperation->band, radioOperation->channelWidth,
                 radioOperation->channel, channels, &num_channels) != 0) {
@@ -1096,6 +1144,11 @@ int execute_radio_channel_api(wifi_mon_collector_element_t *c_elem, wifi_monitor
     ret = wifi_startNeighborScan(private_vap_index, args->scan_mode, dwell_time, num_channels,
         (unsigned int *)channels);
     clock_gettime(CLOCK_MONOTONIC, &(mon_data->last_scan_time[args->radio_index]));
+    if (args->scan_mode == WIFI_RADIO_SCAN_MODE_ONCHAN &&
+        is_dfs_sensitive_onchan_scan(radioOperation)) {
+        clock_gettime(CLOCK_MONOTONIC,
+            &(mon_data->last_onchan_scan_time[args->radio_index]));
+    }
     if (ret != RETURN_OK) {
         mon_data->scan_trigger_retries[args->radio_index]++;
         mon_data->scan_failed[args->radio_index] = true;

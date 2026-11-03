@@ -170,6 +170,7 @@ typedef struct {
     int scan_results_retries[MAX_NUM_RADIOS];
     int scan_trigger_retries[MAX_NUM_RADIOS];
     struct timespec last_scan_time[MAX_NUM_RADIOS];
+    struct timespec last_onchan_scan_time[MAX_NUM_RADIOS];
     bool scan_failed[MAX_NUM_RADIOS];
     unsigned int        upload_period;
     unsigned int        current_poll_iter;
