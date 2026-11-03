@@ -649,11 +649,27 @@ int check_scan_complete_read_results(void *arg)
     int last_scanned_channel_index = 0;
     unsigned int ap_count = 0;
     int id = 0;
+    wifi_radio_operationParam_t *radioOperation = NULL;
     wifi_mon_collector_element_t *c_elem = (wifi_mon_collector_element_t *)arg;
     args = c_elem->args;
     ret = wifi_getNeighboringWiFiStatus(args->radio_index, &neigh_stats, &ap_count);
     if (ret != RETURN_OK) {
         if (errno == EAGAIN || ret == WIFI_HAL_NOT_READY) {
+            radioOperation = getRadioOperationParam(args->radio_index);
+            if (args->scan_mode == WIFI_RADIO_SCAN_MODE_ONCHAN &&
+                is_dfs_sensitive_onchan_scan(radioOperation) &&
+                is_onchan_scan_interval_active(
+                    &mon_data->last_onchan_scan_time[args->radio_index])) {
+                wifi_util_dbg_print(WIFI_MON,
+                    "%s:%d stopping ONCHAN result polling while DFS scan is not ready for "
+                    "radio %d\n",
+                    __func__, __LINE__, args->radio_index);
+                mon_data->scan_results_retries[args->radio_index] = 0;
+                mon_data->scan_trigger_retries[args->radio_index] = 0;
+                mon_data->scan_status[args->radio_index] = 0;
+                return RETURN_OK;
+            }
+
             int max_retries = 0;
             if (args->scan_mode == WIFI_RADIO_SCAN_MODE_FULL || args->scan_mode == WIFI_RADIO_SCAN_MODE_SELECT_CHANNELS) {
                 max_retries = RADIO_SCAN_MAX_RESULTS_RETRIES_FULL_SCAN;
